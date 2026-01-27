@@ -1,26 +1,34 @@
 import type { AuditLogger } from "./AuditLogger.js";
+import { getTableName, isTable } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { getTableName, isTable } from "drizzle-orm/table";
+
+// Enable debug logging via environment variable
+const DEBUG = process.env.AUDIT_DEBUG === "true";
+function debug(...args: any[]) {
+  if (DEBUG) {
+    console.log("[AUDIT DEBUG]", ...args);
+  }
+}
 
 /**
  * Extract table name from Drizzle query builder
- * This is a bit hacky but works with Drizzle's internal structure
  */
 function resolveTableName(table: unknown): string | null {
   if (!table || (typeof table !== "object" && typeof table !== "function")) {
     return null;
   }
 
-  try {
-    if (isTable(table as any)) {
-      return getTableName(table as any);
-    }
-  } catch (_e) {
-    // Ignore detection errors
+  if (isTable(table)) {
+    return getTableName(table);
   }
 
-  const maybeName = (table as any).name;
-  return typeof maybeName === "string" ? maybeName : null;
+  const metaName =
+    (table as any)?._?.name ?? (table as any)?._?.config?.name ?? (table as any)?.name;
+  if (typeof metaName === "string" && metaName.length > 0) {
+    return metaName;
+  }
+
+  return null;
 }
 
 function extractTableName(queryBuilder: any, tableRef?: unknown): string | null {
@@ -75,7 +83,7 @@ function extractWhereClause(queryBuilder: any): any {
     if (queryBuilder._ && queryBuilder._.where) {
       return queryBuilder._.where;
     }
-  } catch (e) {
+  } catch (_e) {
     // Ignore extraction errors
   }
 
@@ -137,42 +145,87 @@ function createExecutionProxy(
   auditLogger: AuditLogger,
   tableRef?: unknown,
 ) {
+  let hasIntercepted = false; // Prevent double interception
+
   const proxy = new Proxy(queryBuilder, {
     get(target, prop) {
       const original = target[prop];
 
-      // Intercept terminal methods that execute the query
-      if (prop === "execute" || prop === "then") {
-        return async function (...args: any[]) {
-          const tableName = extractTableName(target, tableRef);
-
-          // If we can't extract table name or shouldn't audit, just execute
-          if (!tableName || !(auditLogger as any).shouldAudit(tableName)) {
-            return original.apply(target, args);
+      // Intercept promise methods (then, catch, finally) which trigger execution
+      if (prop === "then" || prop === "catch" || prop === "finally") {
+        return function (...args: any[]) {
+          // If we've already intercepted, just pass through
+          if (hasIntercepted) {
+            debug(`Already intercepted for ${operation}, passing through ${String(prop)}`);
+            return original?.apply(target, args);
           }
 
-          // Execute with audit logging
-          return executeWithAudit(
-            operation,
-            tableName,
-            target,
-            original,
-            args,
-            db,
-            auditLogger,
-            tableRef,
+          hasIntercepted = true;
+          const tableName = extractTableName(target, tableRef);
+          debug(`Intercepting ${operation} on ${tableName} via ${String(prop)}`);
+
+          // If we can't extract table name or shouldn't audit, just execute normally
+          if (!tableName || !(auditLogger as any).shouldAudit(tableName)) {
+            debug(
+              `Skipping audit for ${tableName} (shouldAudit: ${tableName ? (auditLogger as any).shouldAudit(tableName) : "no table"})`,
+            );
+            return original?.apply(target, args);
+          }
+
+          // Create a promise that executes with audit
+          const auditedPromise = (async () => {
+            debug(`Executing ${operation} on ${tableName} with audit`);
+            return executeWithAudit(
+              operation,
+              tableName,
+              target,
+              () => {
+                // Execute the query - Drizzle queries are thenable, so we can await them
+                return Promise.resolve(target);
+              },
+              [],
+              db,
+              auditLogger,
+              tableRef,
+            );
+          })();
+
+          // Now apply the promise method to our audited promise
+          return auditedPromise.then(
+            (result) => {
+              debug(
+                `${operation} on ${tableName} completed, result count: ${Array.isArray(result) ? result.length : 1}`,
+              );
+              if (prop === "then" && args[0]) {
+                return args[0](result);
+              }
+              if (prop === "finally" && args[0]) {
+                args[0]();
+              }
+              return result;
+            },
+            (error) => {
+              debug(`${operation} on ${tableName} failed:`, error.message);
+              if (prop === "catch" && args[0]) {
+                return args[0](error);
+              }
+              if (prop === "finally" && args[0]) {
+                args[0]();
+              }
+              throw error;
+            },
           );
         };
       }
 
-      // For fluent API methods (where, set, values, etc.), continue wrapping
+      // For fluent API methods (where, set, values, returning, etc.), continue wrapping
       if (typeof original === "function") {
         return function (...args: any[]) {
           const result = original.apply(target, args);
 
-          // If it returns a new builder, wrap it too
+          // If it returns a new builder, wrap it too (preserve tableRef)
           if (result && typeof result === "object" && result !== target) {
-            return createExecutionProxy(operation, result, db, auditLogger);
+            return createExecutionProxy(operation, result, db, auditLogger, tableRef);
           }
 
           // Preserve the proxy when chaining methods that return `this`
@@ -213,15 +266,25 @@ async function executeWithAudit(
     }
 
     // Execute the actual operation
-    const result = await originalExecute.apply(queryBuilder, executeArgs);
+    // originalExecute might be a function that returns a promise, or the original method
+    let result;
+    if (typeof originalExecute === "function" && originalExecute.length === 0) {
+      // It's a wrapper function we created
+      result = await originalExecute();
+    } else if (originalExecute) {
+      // It's the original method from Drizzle
+      result = await originalExecute.apply(queryBuilder, executeArgs);
+    } else {
+      // No execute method, the queryBuilder itself is thenable
+      result = await queryBuilder;
+    }
 
     // Create audit logs based on operation type
     await createAuditLogs(operation, tableName, beforeState, result, auditLogger);
 
     return result;
   } catch (error) {
-    // If strict mode, rethrow the error
-    // Otherwise, log but allow operation to fail
+    // Always rethrow - let the application handle the error
     throw error;
   }
 }
@@ -254,8 +317,7 @@ async function captureBeforeState(
           queryBuilder._?.table ||
           queryBuilder.config?.table,
       )
-      .where(whereClause)
-      .execute();
+      .where(whereClause);
 
     return Array.isArray(result) ? result : [result];
   } catch (error) {
@@ -276,27 +338,41 @@ async function createAuditLogs(
 ): Promise<void> {
   const records = Array.isArray(result) ? result : result ? [result] : [];
 
+  debug(
+    `Creating audit logs for ${operation} on ${tableName}, records: ${records.length}, beforeState: ${beforeState.length}`,
+  );
+
   if (records.length === 0 && beforeState.length === 0) {
+    debug("No records to audit");
     return;
   }
 
   switch (operation) {
     case "insert":
       if (records.length > 0) {
+        debug(`Logging ${records.length} INSERT operations`);
         await auditLogger.logInsert(tableName, records);
       }
       break;
 
     case "update":
       if (records.length > 0 && beforeState.length > 0) {
+        debug(`Logging ${records.length} UPDATE operations`);
         await auditLogger.logUpdate(tableName, beforeState, records);
+      } else {
+        debug(
+          `Skipping UPDATE audit: records=${records.length}, beforeState=${beforeState.length}`,
+        );
       }
       break;
 
     case "delete":
       // For delete, use beforeState since records are gone
       if (beforeState.length > 0) {
+        debug(`Logging ${beforeState.length} DELETE operations`);
         await auditLogger.logDelete(tableName, beforeState);
+      } else {
+        debug("Skipping DELETE audit: no beforeState");
       }
       break;
   }

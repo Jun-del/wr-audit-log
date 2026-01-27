@@ -35,13 +35,14 @@ const posts = pgTable("demo_posts", {
 
 async function main() {
   console.log("🚀 Starting full flow test...\n");
+
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     throw new Error("DATABASE_URL is not set");
   }
 
   // Connect to database
-  const client = new Client(process.env.DATABASE_URL);
+  const client = new Client(dbUrl);
   await client.connect();
   const originalDb = drizzle(client);
 
