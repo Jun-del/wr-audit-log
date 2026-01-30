@@ -15,12 +15,13 @@
     "README.md"
   ],
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
@@ -37,6 +38,8 @@
     "prepublishOnly": "npm run ci",
     "test": "vitest run",
     "test:full-flow": "dotenvx run -- tsx scripts/test-full-flow.ts",
+    "test:integration": "dotenvx run -- vitest run tests/integration",
+    "test:unit": "vitest run tests/unit",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
