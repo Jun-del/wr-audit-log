@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, serial, text, varchar } from "drizzle-orm/pg-core";
 import { Client } from "pg";
@@ -73,14 +74,20 @@ describe("Batch Mode Integration", () => {
       expect(stats!.queueSize).toBeGreaterThan(0);
 
       // No logs in database yet (not flushed)
-      let logs = await originalDb.select().from(auditLogs);
+      let logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(0);
 
       // Manually flush
       await auditLogger.flush();
 
       // Now logs should be in database
-      logs = await originalDb.select().from(auditLogs);
+      logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(3);
 
       // Queue should be empty
@@ -109,7 +116,10 @@ describe("Batch Mode Integration", () => {
       await db.insert(testUsers).values({ email: "user3@example.com", name: "User 3" }).returning();
 
       // With waitForWrite: true, logs should be written
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(3);
 
       await auditLogger.shutdown();
@@ -136,7 +146,10 @@ describe("Batch Mode Integration", () => {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
       // Logs should be written by now
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(2);
 
       await auditLogger.shutdown();
@@ -164,7 +177,10 @@ describe("Batch Mode Integration", () => {
       await auditLogger.flush();
 
       // Log should be immediately available
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(1);
       expect(logs[0].newValues).toMatchObject({
         email: "sync@example.com",
@@ -191,13 +207,19 @@ describe("Batch Mode Integration", () => {
       await db.insert(testUsers).values({ email: "async@example.com", name: "Async User" });
 
       // Log might not be in database yet
-      const logsBefore = await originalDb.select().from(auditLogs);
+      const logsBefore = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
 
       // Manually flush and wait
       await auditLogger.flush();
 
       // Now log should be there
-      const logsAfter = await originalDb.select().from(auditLogs);
+      const logsAfter = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logsAfter).toHaveLength(1);
 
       await auditLogger.shutdown();
@@ -228,14 +250,20 @@ describe("Batch Mode Integration", () => {
       ]);
 
       // Logs not flushed yet
-      let logs = await originalDb.select().from(auditLogs);
+      let logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs.length).toBeLessThan(5); // Might be 0 if very fast
 
       // Shutdown should flush
       await auditLogger.shutdown();
 
       // All logs should be written now
-      logs = await originalDb.select().from(auditLogs);
+      logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(5);
     });
 
@@ -258,7 +286,10 @@ describe("Batch Mode Integration", () => {
       await auditLogger.shutdown();
       await auditLogger.shutdown();
 
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs).toHaveLength(1);
     });
 
@@ -362,7 +393,10 @@ describe("Batch Mode Integration", () => {
       await auditLogger.flush();
 
       // Should succeed despite potential issues
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs.length).toBeGreaterThan(0);
 
       await auditLogger.shutdown();
@@ -386,7 +420,10 @@ describe("Batch Mode Integration", () => {
       await db.insert(testUsers).values({ email: "ok@example.com", name: "OK" }).returning();
       await auditLogger.flush();
 
-      const logs = await originalDb.select().from(auditLogs);
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.tableName, "batch_test_users"));
       expect(logs.length).toBeGreaterThan(0);
 
       await auditLogger.shutdown();

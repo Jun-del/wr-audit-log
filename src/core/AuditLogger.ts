@@ -5,6 +5,7 @@ import { createDeleteAuditLogs } from "../capture/delete.js";
 import { createInsertAuditLogs } from "../capture/insert.js";
 import { createUpdateAuditLogs } from "../capture/update.js";
 import { BatchAuditWriter } from "../storage/batch-writer.js";
+import { BatchedCustomWriter } from "../storage/batched-custom-writer.js";
 import { AuditWriter } from "../storage/writer.js";
 import { AuditContextManager } from "./context.js";
 import { createInterceptedDb } from "./interceptor.js";
@@ -18,6 +19,7 @@ export class AuditLogger {
   private contextManager = new AuditContextManager();
   private writer: AuditWriter | null = null;
   private batchWriter: BatchAuditWriter | null = null;
+  private batchedCustomWriter: BatchedCustomWriter | null = null;
   private customWriter?: (logs: any[], context: AuditContext | undefined) => Promise<void> | void;
 
   constructor(
@@ -28,16 +30,24 @@ export class AuditLogger {
     this.customWriter = config.customWriter;
 
     // Initialize appropriate writer
-    if (this.config.batch) {
-      // Use batch writer
+    if (this.config.batch && config.customWriter) {
+      // Use batched custom writer
+      this.batchedCustomWriter = new BatchedCustomWriter(config.customWriter, {
+        batchSize: this.config.batch.batchSize,
+        flushInterval: this.config.batch.flushInterval,
+        strictMode: this.config.strictMode,
+        waitForWrite: this.config.batch.waitForWrite,
+      });
+    } else if (this.config.batch) {
+      // Use batch writer (standard)
       this.batchWriter = new BatchAuditWriter(db, {
         auditTable: this.config.auditTable,
         batchSize: this.config.batch.batchSize,
         flushInterval: this.config.batch.flushInterval,
         strictMode: this.config.strictMode,
-        waitForWrite: this.config.batch.waitForWrite,
         getUserId: this.config.getUserId,
         getMetadata: this.config.getMetadata,
+        waitForWrite: this.config.batch.waitForWrite,
       });
     } else {
       // Use immediate writer
@@ -159,11 +169,23 @@ export class AuditLogger {
     const context = this.contextManager.getContext();
 
     try {
-      if (this.customWriter) {
-        // Use custom writer
+      if (this.batchedCustomWriter) {
+        // Use batched custom writer
+        const writePromise = this.batchedCustomWriter.queueAuditLogs(logs, context);
+
+        // Wait for write if configured
+        if (this.config.batch?.waitForWrite || this.config.strictMode) {
+          await writePromise;
+        } else {
+          writePromise.catch((error) => {
+            console.error("Failed to write audit logs:", error);
+          });
+        }
+      } else if (this.customWriter) {
+        // Use custom writer (immediate - no batching)
         await this.customWriter(logs, context);
       } else if (this.batchWriter) {
-        // Use batch writer
+        // Use batch writer (standard)
         const writePromise = this.batchWriter.queueAuditLogs(logs, context);
 
         // Wait for write if configured
@@ -175,7 +197,7 @@ export class AuditLogger {
           });
         }
       } else if (this.writer) {
-        // Use immediate writer
+        // Use immediate writer (standard)
         await this.writer.writeAuditLogs(logs, context);
       }
     } catch (error) {
@@ -265,6 +287,9 @@ export class AuditLogger {
     if (this.batchWriter) {
       await this.batchWriter.flush();
     }
+    if (this.batchedCustomWriter) {
+      await this.batchedCustomWriter.flush();
+    }
   }
 
   /**
@@ -274,6 +299,9 @@ export class AuditLogger {
   async shutdown(): Promise<void> {
     if (this.batchWriter) {
       await this.batchWriter.shutdown();
+    }
+    if (this.batchedCustomWriter) {
+      await this.batchedCustomWriter.shutdown();
     }
   }
 
@@ -287,6 +315,12 @@ export class AuditLogger {
         isShuttingDown: boolean;
       }
     | undefined {
-    return this.batchWriter?.getStats();
+    if (this.batchWriter) {
+      return this.batchWriter.getStats();
+    }
+    if (this.batchedCustomWriter) {
+      return this.batchedCustomWriter.getStats();
+    }
+    return undefined;
   }
 }
