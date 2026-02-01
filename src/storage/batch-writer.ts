@@ -118,22 +118,36 @@ export class BatchAuditWriter {
       });
     });
 
+    // Check queue size BEFORE any async operations to avoid race condition
+    const shouldFlushNow = this.queue.length >= this.config.batchSize;
+
     // Trigger flush if queue is full
-    if (this.queue.length >= this.config.batchSize) {
-      // Don't await here - flush happens async
-      this.flush().catch((error) => {
+    if (shouldFlushNow) {
+      const flushPromise = this.flush();
+
+      // Always log errors, don't silently swallow them
+      flushPromise.catch((error) => {
+        console.error("[AUDIT] Batch flush failed:", error);
         if (this.config.strictMode) {
-          console.error("Failed to flush audit logs:", error);
+          // Re-throw in strict mode
+          throw error;
         }
       });
+
+      // Wait for flush in strict/sync mode
+      if (this.config.strictMode || this.config.waitForWrite) {
+        await flushPromise;
+      }
     }
 
     const shouldAwait = this.config.waitForWrite || this.config.strictMode;
 
     if (!shouldAwait) {
-      // Prevent unhandled rejections when callers don't await writes.
+      // Log errors instead of completely swallowing them
       promises.forEach((promise) => {
-        promise.catch(() => {});
+        promise.catch((err) => {
+          console.error("[AUDIT] Async write failed:", err);
+        });
       });
     }
 
@@ -155,8 +169,11 @@ export class BatchAuditWriter {
     this.flushTimeout = setTimeout(() => {
       this.flush()
         .catch((error) => {
+          // Always log scheduled flush errors
+          console.error("[AUDIT] Scheduled flush failed:", error);
           if (this.config.strictMode) {
-            console.error("Scheduled flush failed:", error);
+            // In strict mode, this is critical
+            console.error("[AUDIT] CRITICAL: Audit logging failure in strict mode");
           }
         })
         .finally(() => {
@@ -250,6 +267,9 @@ export class BatchAuditWriter {
       // Resolve all promises
       items.forEach((item) => item.resolve());
     } catch (error) {
+      // Always log the actual error before rejecting
+      console.error("[AUDIT] Database write failed:", error);
+
       // Reject all promises
       items.forEach((item) => item.reject(error as Error));
       throw error;

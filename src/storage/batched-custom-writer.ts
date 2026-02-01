@@ -113,19 +113,23 @@ export class BatchedCustomWriter {
       });
     });
 
+    // Check queue size BEFORE any async operations
     const shouldFlushNow = this.queue.length >= this.config.batchSize;
 
     // Trigger flush if queue is full
     if (shouldFlushNow) {
+      const flushPromise = this.flush();
+
+      // Log errors instead of silently swallowing
+      flushPromise.catch((error) => {
+        console.error("[AUDIT] Custom writer flush failed:", error);
+        if (this.config.strictMode) {
+          throw error;
+        }
+      });
+
       if (this.config.strictMode || this.config.waitForWrite) {
-        await this.flush();
-      } else {
-        // Don't await here - flush happens async
-        this.flush().catch((error) => {
-          if (this.config.strictMode) {
-            console.error("Failed to flush audit logs:", error);
-          }
-        });
+        await flushPromise;
       }
     }
 
@@ -133,9 +137,11 @@ export class BatchedCustomWriter {
       this.config.strictMode || (this.config.waitForWrite && shouldFlushNow);
 
     if (!shouldAwaitPromises) {
-      // Prevent unhandled rejections when callers don't await writes.
+      // Log errors instead of completely swallowing them
       promises.forEach((promise) => {
-        promise.catch(() => {});
+        promise.catch((err) => {
+          console.error("[AUDIT] Custom writer async write failed:", err);
+        });
       });
     }
 
@@ -155,8 +161,10 @@ export class BatchedCustomWriter {
     this.flushTimeout = setTimeout(() => {
       this.flush()
         .catch((error) => {
+          // Always log scheduled flush errors
+          console.error("[AUDIT] Custom writer scheduled flush failed:", error);
           if (this.config.strictMode) {
-            console.error("Scheduled flush failed:", error);
+            console.error("[AUDIT] CRITICAL: Custom writer failure in strict mode");
           }
         })
         .finally(() => {
@@ -221,12 +229,18 @@ export class BatchedCustomWriter {
           // Resolve all promises in this group
           groupItems.forEach((item) => item.resolve());
         } catch (error) {
+          // Log error before rejecting
+          console.error("[AUDIT] Custom writer execution failed:", error);
+
           // Reject all promises in this group
           groupItems.forEach((item) => item.reject(error as Error));
           throw error;
         }
       }
     } catch (error) {
+      // Log the actual error
+      console.error("[AUDIT] Custom writer batch failed:", error);
+
       // If we couldn't group properly, reject all
       items.forEach((item) => item.reject(error as Error));
       throw error;
