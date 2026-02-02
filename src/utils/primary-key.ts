@@ -21,9 +21,8 @@ export function extractPrimaryKey(record: Record<string, unknown>, tableName: st
     return String(record[idField]);
   }
 
-  // Last resort: use entire record as JSON (for composite keys or no PK)
-  // This is not ideal but ensures we can always generate a record identifier
-  return JSON.stringify(record);
+  // Last resort - safe JSON stringify with BigInt and circular reference handling
+  return safeStringifyForPK(record);
 }
 
 /**
@@ -34,4 +33,40 @@ export function extractPrimaryKeys(
   tableName: string,
 ): string[] {
   return records.map((record) => extractPrimaryKey(record, tableName));
+}
+
+/**
+ * Safe stringify for primary key generation
+ * Handles BigInt, Date, and circular references
+ */
+function safeStringifyForPK(record: Record<string, unknown>): string {
+  const seen = new WeakSet<object>();
+
+  try {
+    return JSON.stringify(record, (key, value) => {
+      // Handle BigInt
+      if (typeof value === "bigint") {
+        return value.toString();
+      }
+
+      // Handle Date
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      // Handle circular references
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return "[Circular]";
+        }
+        seen.add(value);
+      }
+
+      return value;
+    });
+  } catch (error) {
+    // Final fallback: create a stable hash-like string from object keys
+    const keys = Object.keys(record).sort();
+    return `composite_key_${keys.join("_")}_${keys.length}`;
+  }
 }
