@@ -1,5 +1,11 @@
 # wr-audit-logger
 
+## 0.1.2
+
+### Patch Changes
+
+- a3c0995: type-safe audited db keeps Drizzle schema
+
 ## 0.1.1
 
 ### Patch Changes
