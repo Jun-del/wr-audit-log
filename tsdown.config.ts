@@ -7,4 +7,7 @@ export default defineConfig({
   outDir: "dist",
   target: false,
   external: ["drizzle-orm", "pg"],
+  outputOptions: {
+    exports: "named",
+  },
 });
