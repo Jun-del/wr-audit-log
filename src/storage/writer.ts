@@ -2,6 +2,7 @@ import type { AuditLog, AuditLogEntry } from "../types/audit.js";
 import type { AuditContext, NormalizedConfig } from "../types/config.js";
 import { sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { mergeMetadata } from "../utils/metadata.js";
 import { safeSerialize } from "../utils/serializer.js";
 
 /**
@@ -28,7 +29,7 @@ export class AuditWriter {
         userId: userId || context?.userId,
         ipAddress: context?.ipAddress,
         userAgent: context?.userAgent,
-        metadata: { ...metadata, ...context?.metadata, ...log.metadata },
+        metadata: mergeMetadata(metadata, context?.metadata, log.metadata) ?? undefined,
         transactionId: context?.transactionId,
       }));
 

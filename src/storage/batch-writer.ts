@@ -2,6 +2,7 @@ import type { AuditLog, AuditLogEntry } from "../types/audit.js";
 import type { AuditContext } from "../types/config.js";
 import { sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { mergeMetadata } from "../utils/metadata.js";
 import { safeSerialize } from "../utils/serializer.js";
 
 export interface BatchAuditWriterStats {
@@ -112,7 +113,7 @@ export class BatchAuditWriter {
         this.queue.push({
           log: {
             ...log,
-            metadata: { ...metadata, ...context?.metadata, ...log.metadata },
+            metadata: mergeMetadata(metadata, context?.metadata, log.metadata) ?? undefined,
           },
           context: {
             ...context,
