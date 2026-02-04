@@ -16,7 +16,7 @@ describe("Capture Configuration (Unit Tests)", () => {
       strictMode: false,
       getUserId: vi.fn().mockReturnValue(undefined),
       getMetadata: vi.fn().mockReturnValue({}),
-      captureOldValues: false,
+      updateValuesMode: "full",
       customWriter: undefined,
     };
   });
@@ -35,7 +35,7 @@ describe("Capture Configuration (Unit Tests)", () => {
         action: "INSERT",
         tableName: "test_users",
         recordId: "1",
-        newValues: {
+        values: {
           id: 1,
           email: "test@example.com",
           name: "Test User",
@@ -52,20 +52,20 @@ describe("Capture Configuration (Unit Tests)", () => {
 
       const logs = createInsertAuditLogs("test_users", [record], mockConfig);
 
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         id: 1,
         email: "test@example.com",
       });
-      expect(logs[0].newValues).not.toHaveProperty("password");
+      expect(logs[0].values).not.toHaveProperty("password");
     });
   });
 
-  describe("UPDATE capture with captureOldValues=true", () => {
+  describe('UPDATE capture with updateValuesMode="changed"', () => {
     beforeEach(() => {
-      mockConfig.captureOldValues = true;
+      mockConfig.updateValuesMode = "changed";
     });
 
-    it("should capture both old and new values when enabled", () => {
+    it("should capture only changed values when enabled", () => {
       const beforeRecords = [{ id: 1, email: "old@example.com", name: "Old Name" }];
       const afterRecords = [{ id: 1, email: "new@example.com", name: "New Name" }];
 
@@ -76,17 +76,10 @@ describe("Capture Configuration (Unit Tests)", () => {
         action: "UPDATE",
         tableName: "test_users",
         recordId: "1",
-        oldValues: {
-          id: 1,
-          email: "old@example.com",
-          name: "Old Name",
-        },
-        newValues: {
-          id: 1,
+        values: {
           email: "new@example.com",
           name: "New Name",
         },
-        changedFields: ["email", "name"],
       });
     });
 
@@ -104,9 +97,7 @@ describe("Capture Configuration (Unit Tests)", () => {
 
       const logs = createUpdateAuditLogs("test_users", beforeRecords, afterRecords, mockConfig);
 
-      expect(logs[0].changedFields).toEqual(["name"]);
-      expect(logs[0].oldValues?.name).toBe("Old Name");
-      expect(logs[0].newValues?.name).toBe("New Name");
+      expect(logs[0].values).toMatchObject({ name: "New Name" });
     });
 
     it("should log new values when before state is missing", () => {
@@ -119,13 +110,11 @@ describe("Capture Configuration (Unit Tests)", () => {
         action: "UPDATE",
         tableName: "test_users",
         recordId: "1",
-        oldValues: undefined,
-        newValues: {
+        values: {
           id: 1,
           email: "new@example.com",
           name: "New Name",
         },
-        changedFields: undefined,
       });
     });
 
@@ -143,19 +132,21 @@ describe("Capture Configuration (Unit Tests)", () => {
       const logWithBefore = logs.find((log) => log.recordId === "1");
       const logWithoutBefore = logs.find((log) => log.recordId === "2");
 
-      expect(logWithBefore?.oldValues).toBeDefined();
-      expect(logWithBefore?.changedFields).toEqual(["email", "name"]);
-      expect(logWithoutBefore?.oldValues).toBeUndefined();
-      expect(logWithoutBefore?.changedFields).toBeUndefined();
+      expect(logWithBefore?.values).toMatchObject({ email: "new@example.com", name: "New Name" });
+      expect(logWithoutBefore?.values).toMatchObject({
+        id: 2,
+        email: "missing@example.com",
+        name: "Missing Before",
+      });
     });
   });
 
-  describe("UPDATE capture with captureOldValues=false", () => {
+  describe('UPDATE capture with updateValuesMode="full"', () => {
     beforeEach(() => {
-      mockConfig.captureOldValues = false;
+      mockConfig.updateValuesMode = "full";
     });
 
-    it("should NOT capture old values when disabled", () => {
+    it("should capture full after values when in full mode", () => {
       const beforeRecords: any[] = []; // Empty - no before state captured
       const afterRecords = [{ id: 1, email: "new@example.com", name: "New Name" }];
 
@@ -166,13 +157,11 @@ describe("Capture Configuration (Unit Tests)", () => {
         action: "UPDATE",
         tableName: "test_users",
         recordId: "1",
-        oldValues: undefined,
-        newValues: {
+        values: {
           id: 1,
           email: "new@example.com",
           name: "New Name",
         },
-        changedFields: undefined,
       });
     });
 
@@ -186,9 +175,7 @@ describe("Capture Configuration (Unit Tests)", () => {
 
       expect(logs).toHaveLength(2);
       logs.forEach((log) => {
-        expect(log.oldValues).toBeUndefined();
-        expect(log.newValues).toBeDefined();
-        expect(log.changedFields).toBeUndefined();
+        expect(log.values).toBeDefined();
       });
     });
   });
@@ -204,12 +191,11 @@ describe("Capture Configuration (Unit Tests)", () => {
         action: "DELETE",
         tableName: "test_users",
         recordId: "1",
-        oldValues: {
+        values: {
           id: 1,
           email: "deleted@example.com",
           name: "Deleted User",
         },
-        newValues: undefined,
       });
     });
 
@@ -243,13 +229,13 @@ describe("Capture Configuration (Unit Tests)", () => {
 
       const logs = createInsertAuditLogs("test_users", [record], mockConfig);
 
-      expect(logs[0].newValues).toEqual({
+      expect(logs[0].values).toEqual({
         id: 1,
         email: "test@example.com",
       });
-      expect(logs[0].newValues).not.toHaveProperty("name");
-      expect(logs[0].newValues).not.toHaveProperty("password");
-      expect(logs[0].newValues).not.toHaveProperty("internalNote");
+      expect(logs[0].values).not.toHaveProperty("name");
+      expect(logs[0].values).not.toHaveProperty("password");
+      expect(logs[0].values).not.toHaveProperty("internalNote");
     });
 
     it("should apply both fields and excludeFields filters", () => {
@@ -268,7 +254,7 @@ describe("Capture Configuration (Unit Tests)", () => {
       const logs = createInsertAuditLogs("test_users", [record], mockConfig);
 
       // Should have id and email, but not password (excluded) or name (not in fields)
-      expect(logs[0].newValues).toEqual({
+      expect(logs[0].values).toEqual({
         id: 1,
         email: "test@example.com",
       });
@@ -276,8 +262,8 @@ describe("Capture Configuration (Unit Tests)", () => {
   });
 
   describe("Performance implications", () => {
-    it("captureOldValues=false should result in logs without oldValues", () => {
-      mockConfig.captureOldValues = false;
+    it('updateValuesMode="full" should result in logs with full values', () => {
+      mockConfig.updateValuesMode = "full";
 
       const afterRecords = [{ id: 1, email: "test@example.com", name: "Test" }];
 
@@ -288,19 +274,19 @@ describe("Capture Configuration (Unit Tests)", () => {
         mockConfig,
       );
 
-      expect(logs[0].oldValues).toBeUndefined();
+      expect(logs[0].values).toBeDefined();
       // This represents the performance benefit: no SELECT query needed
     });
 
-    it("captureOldValues=true should result in logs with oldValues", () => {
-      mockConfig.captureOldValues = true;
+    it('updateValuesMode="changed" should result in logs with diff values', () => {
+      mockConfig.updateValuesMode = "changed";
 
       const beforeRecords = [{ id: 1, email: "old@example.com", name: "Old" }];
       const afterRecords = [{ id: 1, email: "new@example.com", name: "New" }];
 
       const logs = createUpdateAuditLogs("test_users", beforeRecords, afterRecords, mockConfig);
 
-      expect(logs[0].oldValues).toBeDefined();
+      expect(logs[0].values).toMatchObject({ email: "new@example.com", name: "New" });
       // This represents the cost: SELECT query was executed
     });
   });

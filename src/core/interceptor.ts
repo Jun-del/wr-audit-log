@@ -310,7 +310,7 @@ async function executeWithAudit(
 
   try {
     // For UPDATE only, capture the "before" state if configured
-    if (operation === "update" && auditLogger.shouldCaptureOldValues()) {
+    if (operation === "update" && auditLogger.shouldCaptureBeforeState()) {
       beforeState = await captureBeforeState(tableName, queryBuilder, db, tableRef);
     }
 
@@ -415,8 +415,8 @@ async function createAuditLogs(
         debug(`Logging ${recordObjects.length} UPDATE operations`);
         await auditLogger.logUpdate(tableName, beforeObjects, recordObjects);
       } else if (recordObjects.length > 0 && beforeObjects.length === 0) {
-        // captureOldValues is disabled, log without old values
-        debug(`Logging ${recordObjects.length} UPDATE operations (without old values)`);
+        // Before state not captured; log with best-effort values
+        debug(`Logging ${recordObjects.length} UPDATE operations (without before state)`);
         await auditLogger.logUpdate(tableName, [], recordObjects);
       } else {
         debug(

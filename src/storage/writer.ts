@@ -57,9 +57,7 @@ export class AuditWriter {
       action: entry.action,
       table_name: entry.tableName,
       record_id: entry.recordId,
-      old_values: entry.oldValues ? safeSerialize(entry.oldValues) : null,
-      new_values: entry.newValues ? safeSerialize(entry.newValues) : null,
-      changed_fields: entry.changedFields || null,
+      values: entry.values ? safeSerialize(entry.values) : null,
       metadata: entry.metadata ? safeSerialize(entry.metadata) : null,
       transaction_id: entry.transactionId || null,
     }));
@@ -68,11 +66,11 @@ export class AuditWriter {
     await this.db.execute(sql`
       INSERT INTO ${sql.identifier(tableName)} (
         user_id, ip_address, user_agent, action, table_name, record_id,
-        old_values, new_values, changed_fields, metadata, transaction_id
+        "values", metadata, transaction_id
       )
       SELECT
         user_id, ip_address, user_agent, action, table_name, record_id,
-        old_values, new_values, changed_fields, metadata, transaction_id
+        "values", metadata, transaction_id
       FROM jsonb_to_recordset(${JSON.stringify(values)}::jsonb) AS t(
         user_id VARCHAR,
         ip_address VARCHAR,
@@ -80,9 +78,7 @@ export class AuditWriter {
         action VARCHAR,
         table_name VARCHAR,
         record_id VARCHAR,
-        old_values JSONB,
-        new_values JSONB,
-        changed_fields TEXT[],
+        "values" JSONB,
         metadata JSONB,
         transaction_id VARCHAR
       )

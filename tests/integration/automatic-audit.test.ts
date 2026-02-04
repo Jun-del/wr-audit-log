@@ -120,12 +120,12 @@ describe("Automatic Audit Logging (Integration)", () => {
       expect(logs[0].recordId).toBe(String(user.id));
       expect(logs[0].userId).toBe("test-user-123");
       expect(logs[0].ipAddress).toBe("127.0.0.1");
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "test@example.com",
         name: "Test User",
       });
       // Password should be excluded
-      expect(logs[0].newValues).not.toHaveProperty("password");
+      expect(logs[0].values).not.toHaveProperty("password");
     });
 
     it("should log bulk inserts", async () => {
@@ -179,18 +179,18 @@ describe("Automatic Audit Logging (Integration)", () => {
 
       expect(logs).toHaveLength(1);
       expect(logs[0].action).toBe("UPDATE");
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         name: "Updated Name",
         email: "updated@example.com",
       });
-      // Note: oldValues will be null/undefined because captureOldValues defaults to false
+      // Note: values contains only changed fields by default
     });
 
-    it("should not log update if nothing changed (when captureOldValues=true)", async () => {
-      // Create a new logger with captureOldValues enabled for this test
+    it('should not log update if nothing changed (when updateValuesMode="changed")', async () => {
+      // Create a new logger with updateValuesMode set to changed for this test
       const auditLogger = createAuditLogger(originalDb, {
         tables: [USERS_TABLE],
-        captureOldValues: true,
+        updateValuesMode: "changed",
       });
 
       const testDb = auditLogger.db;
@@ -235,11 +235,10 @@ describe("Automatic Audit Logging (Integration)", () => {
 
       expect(logs).toHaveLength(1);
       expect(logs[0].action).toBe("DELETE");
-      expect(logs[0].oldValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "delete@example.com",
         name: "To Delete",
       });
-      expect(logs[0].newValues).toBeNull();
     });
   });
 

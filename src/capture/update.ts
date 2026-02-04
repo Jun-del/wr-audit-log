@@ -1,7 +1,7 @@
 import type { AuditLog } from "../types/audit.js";
 import type { NormalizedConfig } from "../types/config.js";
 import { extractPrimaryKey } from "../utils/primary-key.js";
-import { filterFields, getChangedFields } from "../utils/serializer.js";
+import { filterFields, getChangedValues } from "../utils/serializer.js";
 
 /**
  * Create audit logs for UPDATE operations
@@ -14,36 +14,17 @@ export function createUpdateAuditLogs(
 ): AuditLog[] {
   const logs: AuditLog[] = [];
 
-  if (!config.captureOldValues) {
+  if (config.updateValuesMode === "full" || beforeRecords.length === 0) {
+    // Full row mode or fallback when before state isn't available
     for (const after of afterRecords) {
       if (!after) continue;
 
-      const newValues = filterFields(after, tableName, config);
+      const values = filterFields(after, tableName, config);
       logs.push({
         action: "UPDATE" as const,
         tableName,
         recordId: extractPrimaryKey(after, tableName),
-        oldValues: undefined,
-        newValues,
-        changedFields: undefined,
-      });
-    }
-    return logs;
-  }
-
-  if (beforeRecords.length === 0) {
-    // Fallback: log updates even when old values can't be captured.
-    for (const after of afterRecords) {
-      if (!after) continue;
-
-      const newValues = filterFields(after, tableName, config);
-      logs.push({
-        action: "UPDATE" as const,
-        tableName,
-        recordId: extractPrimaryKey(after, tableName),
-        oldValues: undefined,
-        newValues,
-        changedFields: undefined,
+        values,
       });
     }
     return logs;
@@ -62,31 +43,27 @@ export function createUpdateAuditLogs(
 
     const before = beforeById.get(extractPrimaryKey(after, tableName));
     if (!before) {
-      const newValues = filterFields(after, tableName, config);
+      const values = filterFields(after, tableName, config);
       logs.push({
         action: "UPDATE" as const,
         tableName,
         recordId: extractPrimaryKey(after, tableName),
-        oldValues: undefined,
-        newValues,
-        changedFields: undefined,
+        values,
       });
       continue;
     }
 
-    const oldValues = filterFields(before, tableName, config);
-    const newValues = filterFields(after, tableName, config);
-    const changedFields = getChangedFields(oldValues, newValues);
+    const beforeValues = filterFields(before, tableName, config);
+    const afterValues = filterFields(after, tableName, config);
+    const changedValues = getChangedValues(beforeValues, afterValues);
 
     // Only create audit log if something actually changed
-    if (changedFields.length > 0) {
+    if (changedValues && Object.keys(changedValues).length > 0) {
       logs.push({
         action: "UPDATE" as const,
         tableName,
         recordId: extractPrimaryKey(after, tableName),
-        oldValues,
-        newValues,
-        changedFields,
+        values: changedValues,
       });
     }
   }

@@ -157,7 +157,7 @@ async function main() {
       action,
       table_name,
       record_id,
-      changed_fields,
+      "values",
       transaction_id,
       created_at
     FROM audit_logs 

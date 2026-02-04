@@ -55,11 +55,11 @@ describe("Capture Configuration", () => {
     await originalDb.execute(`DELETE FROM audit_logs WHERE table_name = '${TABLE_NAME}'`);
   });
 
-  describe("captureOldValues configuration", () => {
-    it("should capture old values when enabled", async () => {
+  describe("updateValuesMode configuration", () => {
+    it("should capture changed values when enabled", async () => {
       const auditLogger = createAuditLogger(originalDb, {
         tables: [TABLE_NAME],
-        captureOldValues: true,
+        updateValuesMode: "changed",
       });
 
       const { db, setContext } = auditLogger;
@@ -81,15 +81,13 @@ describe("Capture Configuration", () => {
         .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toBeDefined();
-      expect(logs[0].oldValues).toMatchObject({ name: "Original Name" });
-      expect(logs[0].newValues).toMatchObject({ name: "Updated Name" });
+      expect(logs[0].values).toMatchObject({ name: "Updated Name" });
     });
 
-    it("should NOT capture old values when disabled (default)", async () => {
+    it("should store full after values when in full mode", async () => {
       const auditLogger = createAuditLogger(originalDb, {
         tables: [TABLE_NAME],
-        captureOldValues: false, // Default
+        updateValuesMode: "full",
       });
 
       const { db, setContext } = auditLogger;
@@ -110,10 +108,8 @@ describe("Capture Configuration", () => {
         .from(auditLogs)
         .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
 
-      // Should still create an audit log, but without old values
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toBeNull();
-      expect(logs[0].newValues).toMatchObject({ name: "Updated Name" });
+      expect(logs[0].values).toMatchObject({ name: "Updated Name" });
     });
   });
 
@@ -145,12 +141,10 @@ describe("Capture Configuration", () => {
         .where(and(eq(auditLogs.action, "DELETE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toBeDefined();
-      expect(logs[0].oldValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "delete@example.com",
         name: "To Be Deleted",
       });
-      expect(logs[0].newValues).toBeNull();
     });
 
     it("should not create audit log when DELETE matches no records", async () => {
@@ -176,10 +170,10 @@ describe("Capture Configuration", () => {
   });
 
   describe("Performance benefits", () => {
-    it("should skip SELECT query when captureOldValues is false", async () => {
+    it('should skip SELECT query when updateValuesMode is "full"', async () => {
       const auditLogger = createAuditLogger(originalDb, {
         tables: [TABLE_NAME],
-        captureOldValues: false,
+        updateValuesMode: "full",
       });
 
       const { db, setContext } = auditLogger;
@@ -202,8 +196,7 @@ describe("Capture Configuration", () => {
         .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toBeNull();
-      expect(logs[0].newValues).toMatchObject({ name: "New Name" });
+      expect(logs[0].values).toMatchObject({ name: "New Name" });
     });
   });
 });

@@ -126,7 +126,7 @@ describe("AuditLogger", () => {
       auditLogger = new AuditLogger(mockDb, {
         tables: ["users", "vehicles"],
         excludeFields: ["password"],
-        captureOldValues: true,
+        updateValuesMode: "changed",
       });
 
       const record = { id: 1, name: "Same", email: "same@example.com" };

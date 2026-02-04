@@ -12,7 +12,7 @@ describe("Raw SQL execution", () => {
     db = { execute: executeMock };
     auditLogger = {
       shouldAudit: vi.fn().mockReturnValue(true),
-      shouldCaptureOldValues: vi.fn().mockReturnValue(false),
+      shouldCaptureBeforeState: vi.fn().mockReturnValue(false),
       logInsert: vi.fn(),
       logUpdate: vi.fn(),
       logDelete: vi.fn(),
@@ -49,7 +49,7 @@ describe("Raw SQL execution", () => {
 describe("sql`...` inside query builders", () => {
   const makeAuditLogger = () => ({
     shouldAudit: vi.fn().mockReturnValue(true),
-    shouldCaptureOldValues: vi.fn().mockReturnValue(false),
+    shouldCaptureBeforeState: vi.fn().mockReturnValue(false),
     logInsert: vi.fn(),
     logUpdate: vi.fn(),
     logDelete: vi.fn(),
@@ -109,7 +109,7 @@ describe("sql`...` inside query builders", () => {
     };
 
     const auditLogger = makeAuditLogger();
-    auditLogger.shouldCaptureOldValues.mockReturnValue(true);
+    auditLogger.shouldCaptureBeforeState.mockReturnValue(true);
 
     const auditedDb = createInterceptedDb(db as any, auditLogger as any);
 

@@ -76,9 +76,7 @@ export class BatchedCustomWriter {
         action: string;
         tableName: string;
         recordId: string;
-        oldValues?: Record<string, unknown>;
-        newValues?: Record<string, unknown>;
-        changedFields?: string[];
+        values?: Record<string, unknown>;
         metadata?: Record<string, unknown>;
       }>,
       context: AuditContext | undefined,
