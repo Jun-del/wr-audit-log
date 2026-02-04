@@ -54,6 +54,27 @@ export function getChangedFields(
 }
 
 /**
+ * Get changed values (after) for keys that differ between before/after
+ */
+export function getChangedValues(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!before || !after) return undefined;
+
+  const changed: Record<string, unknown> = {};
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+
+  for (const key of allKeys) {
+    if (!isDeepStrictEqual(before[key], after[key])) {
+      changed[key] = after[key];
+    }
+  }
+
+  return changed;
+}
+
+/**
  * Safely serialize a value for storage
  * Handles dates, bigints, and other special types
  */

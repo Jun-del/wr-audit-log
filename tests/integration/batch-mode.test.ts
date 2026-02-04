@@ -182,7 +182,7 @@ describe("Batch Mode Integration", () => {
         .from(auditLogs)
         .where(eq(auditLogs.tableName, USERS_TABLE));
       expect(logs).toHaveLength(1);
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "sync@example.com",
         name: "Sync User",
       });

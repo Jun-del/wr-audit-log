@@ -21,9 +21,7 @@ export const auditLogs = pgTable(
     recordId: varchar("record_id", { length: 255 }).notNull(),
 
     // Data changes
-    oldValues: jsonb("old_values"),
-    newValues: jsonb("new_values"),
-    changedFields: text("changed_fields").array(),
+    values: jsonb("values"),
 
     // When it happened
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -66,9 +64,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   table_name VARCHAR(255) NOT NULL,
   record_id VARCHAR(255) NOT NULL,
   
-  old_values JSONB,
-  new_values JSONB,
-  changed_fields TEXT[],
+  "values" JSONB,
   
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   

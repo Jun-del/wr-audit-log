@@ -24,7 +24,7 @@ INSERT INTO audit_logs (...) VALUES (...);
 
 ### UPDATE Operations
 
-#### With `captureOldValues: false` (default)
+#### With `updateValuesMode: "changed"` (default)
 
 **Queries per operation: 2**
 
@@ -42,7 +42,7 @@ INSERT INTO audit_logs (...) VALUES (...);
 - Batch mode (100 logs): ~0.1-0.2ms per update
 - **Speedup with batch mode: 5-10x**
 
-#### With `captureOldValues: true`
+#### With `updateValuesMode: "full"`
 
 **Queries per operation: 3**
 
@@ -62,7 +62,7 @@ INSERT INTO audit_logs (...) VALUES (...);
 - Baseline overhead: ~2-3ms per update
 - Additional SELECT query adds ~0.5-1ms
 - Batch mode (100 logs): ~0.2-0.3ms per update
-- **Trade-off: 50% more queries for complete audit trail**
+- **Trade-off: 50% fewer queries but only full after state**
 
 ### DELETE Operations
 
@@ -167,7 +167,7 @@ Speedup: 2.5x
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: true, // Full audit trail
+  updateValuesMode: "changed", // Store only changed fields
   // No batch mode needed
 });
 ```
@@ -179,7 +179,7 @@ const auditLogger = createAuditLogger(db, {
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: true, // If you need full trail
+  updateValuesMode: "changed", // If you need changed fields
   batch: {
     batchSize: 50,
     flushInterval: 500,
@@ -195,7 +195,7 @@ const auditLogger = createAuditLogger(db, {
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: false, // Skip old values
+  updateValuesMode: "full", // Store full after row
   batch: {
     batchSize: 100,
     flushInterval: 1000,
@@ -211,7 +211,7 @@ const auditLogger = createAuditLogger(db, {
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: false,
+  updateValuesMode: "full",
   batch: {
     batchSize: 500, // Large batches
     flushInterval: 5000,
@@ -348,7 +348,7 @@ Total overhead: 5 * 0.5ms = 2.5ms per order
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["events"],
-  captureOldValues: false, // Don't need old values for events
+  updateValuesMode: "full", // Don't need changed fields for events
   batch: {
     batchSize: 100,
     flushInterval: 500,
@@ -389,15 +389,15 @@ console.log({
 
 **Check:**
 
-1. Is `captureOldValues` enabled unnecessarily?
+1. Is `updateValuesMode: "changed"` enabled unnecessarily?
 2. Are you using batch mode?
 3. Database connection pool size?
 
 **Fix:**
 
 ```typescript
-// Disable old values if not needed
-captureOldValues: false,
+// Use full after row if changed fields not needed
+updateValuesMode: "full",
 
 // Enable batching
 batch: {
@@ -446,7 +446,7 @@ const stats = auditLogger.getStats();
 4. **Tune batch size:** Start with 100, adjust based on metrics
 5. **Monitor queue:** Alert on queue size
 6. **Graceful shutdown:** Always call `shutdown()` before exit
-7. **Skip old values:** Set `captureOldValues: false` unless required
+7. **Skip changed fields:** Set `updateValuesMode: "full"` unless required
 8. **Custom fields only:** Use `fields` config to limit audited columns
 
 ## Summary Table

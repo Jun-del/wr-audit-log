@@ -70,7 +70,7 @@ await db.execute(createAuditTableSQL);
 ### Problem: Migration fails
 
 ```
-Error: column "old_values" does not exist
+Error: column "values" does not exist
 ```
 
 **Solution:**
@@ -249,12 +249,12 @@ console.log(`Took: ${Date.now() - start}ms`);
    });
    ```
 
-2. **Disable `captureOldValues` if not needed:**
+2. **Use full update mode if changed fields not needed:**
 
    ```typescript
    const auditLogger = createAuditLogger(db, {
      tables: ["users"],
-     captureOldValues: false, // Skip SELECT before UPDATE
+     updateValuesMode: "full", // Skip SELECT before UPDATE
    });
    ```
 
@@ -353,7 +353,7 @@ console.log(`Queue size: ${stats.queueSize}`);
 
 ### Problem: Sensitive data in audit logs
 
-**Symptom:** Password, tokens appear in `old_values` or `new_values`.
+**Symptom:** Password, tokens appear in `values`.
 
 **Solution:**
 
@@ -364,18 +364,18 @@ const auditLogger = createAuditLogger(db, {
 });
 ```
 
-### Problem: `old_values` is always `null`
+### Problem: UPDATE logs store full rows
 
-**Symptom:** UPDATE logs don't have before state.
+**Symptom:** `values` includes all columns instead of only changed fields.
 
-**Explanation:** Default is `captureOldValues: false` for performance.
+**Explanation:** `updateValuesMode` is set to `"full"`.
 
 **Solution:**
 
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: true, // Enable old values
+  updateValuesMode: "changed", // Store only changed fields
 });
 ```
 
@@ -418,18 +418,18 @@ The library tries to extract the primary key from these fields (in order):
 **Solution 2: Custom serialization**
 Modify `extractPrimaryKey` in `src/utils/primary-key.ts` for your schema.
 
-### Problem: `changed_fields` is empty
+### Problem: No changed fields in UPDATE logs
 
-**Symptom:** UPDATE logs show changes but `changed_fields` is `[]`.
+**Symptom:** UPDATE logs show full rows; you can't tell which fields changed.
 
-**Explanation:** This happens when `captureOldValues: false`.
+**Explanation:** This happens when `updateValuesMode: "full"`.
 
 **Solution:**
 
 ```typescript
 const auditLogger = createAuditLogger(db, {
   tables: ["users"],
-  captureOldValues: true, // Required for changed_fields
+  updateValuesMode: "changed", // Store only changed fields
 });
 ```
 
@@ -640,7 +640,7 @@ If you're still stuck:
 
 1. **Not using wrapped db** - Use `auditedDb` from `createAuditLogger`, not original `db`
 2. **Calling `.returning()` explicitly** - Auto-injected, don't call manually
-3. **Forgetting `captureOldValues`** - Defaults to `false` for performance
+3. **Forgetting `updateValuesMode`** - Defaults to `"changed"`
 4. **Not calling `shutdown()`** - Always shutdown gracefully
 5. **Using raw SQL** - Use Drizzle query builders or manual logging
 6. **Wrong transaction usage** - Use wrapped `tx` from callback

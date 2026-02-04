@@ -15,8 +15,6 @@ export function createDeleteAuditLogs(
     action: "DELETE" as const,
     tableName,
     recordId: extractPrimaryKey(record, tableName),
-    oldValues: filterFields(record, tableName, config),
-    newValues: undefined,
-    changedFields: undefined,
+    values: filterFields(record, tableName, config),
   }));
 }

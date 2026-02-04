@@ -158,7 +158,7 @@ export function createAuditLogger<TSchema extends Record<string, unknown>>(
      *   action: 'READ',
      *   tableName: 'sensitive_documents',
      *   recordId: doc.id,
-     *   newValues: { accessed: true },
+     *   values: { accessed: true },
      *   metadata: { reason: 'user_request' }
      * });
      * ```

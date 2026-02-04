@@ -10,9 +10,7 @@ export interface AuditLog {
   action: AuditAction;
   tableName: string;
   recordId: string;
-  oldValues?: Record<string, unknown>;
-  newValues?: Record<string, unknown>;
-  changedFields?: string[];
+  values?: Record<string, unknown>;
   metadata?: Record<string, unknown>; // Add metadata to individual logs
 }
 
@@ -39,9 +37,7 @@ export interface StoredAuditLog {
   action: AuditAction;
   tableName: string;
   recordId: string;
-  oldValues: Record<string, unknown> | null;
-  newValues: Record<string, unknown> | null;
-  changedFields: string[] | null;
+  values: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   transactionId: string | null;
   createdAt: Date;

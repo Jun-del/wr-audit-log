@@ -47,11 +47,12 @@ export interface AuditConfig {
   getMetadata?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
-   * Whether to capture "before" values for UPDATE operations
-   * Disabling this skips the additional SELECT query before updates
-   * @default false
+   * How UPDATE values are stored
+   * - "changed": store only changed fields (requires SELECT before UPDATE)
+   * - "full": store full row after UPDATE (no extra SELECT)
+   * @default "changed"
    */
-  captureOldValues?: boolean;
+  updateValuesMode?: "changed" | "full";
 
   /**
    * Batch configuration for async writes
@@ -84,9 +85,7 @@ export interface AuditConfig {
       action: string;
       tableName: string;
       recordId: string;
-      oldValues?: Record<string, unknown>;
-      newValues?: Record<string, unknown>;
-      changedFields?: string[];
+      values?: Record<string, unknown>;
       metadata?: Record<string, unknown>;
     }>,
     context: AuditContext | undefined,
@@ -180,7 +179,7 @@ export type NormalizedConfig = Required<
 > & {
   getUserId: () => string | undefined | Promise<string | undefined>;
   getMetadata: () => Record<string, unknown> | Promise<Record<string, unknown>>;
-  captureOldValues: boolean;
+  updateValuesMode: "changed" | "full";
   batch: Required<BatchConfig> | null;
   customWriter?: (logs: any[], context: AuditContext | undefined) => Promise<void> | void;
 };

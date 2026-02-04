@@ -78,13 +78,13 @@ describe("Automatic .returning() Injection", () => {
 
       expect(logs).toHaveLength(1);
       expect(logs[0].tableName).toBe(TABLE_NAME);
-      expect(logs[0].newValues).toBeDefined();
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toBeDefined();
+      expect(logs[0].values).toMatchObject({
         email: "auto@example.com",
         name: "Auto Test",
       });
       // The ID should also be captured since .returning() was auto-injected
-      expect(logs[0].newValues).toHaveProperty("id");
+      expect(logs[0].values).toHaveProperty("id");
       expect(logs[0].recordId).toBeTruthy();
     });
 
@@ -110,9 +110,9 @@ describe("Automatic .returning() Injection", () => {
         .where(and(eq(auditLogs.action, "INSERT"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(3);
-      expect(logs[0].newValues).toHaveProperty("email");
-      expect(logs[1].newValues).toHaveProperty("email");
-      expect(logs[2].newValues).toHaveProperty("email");
+      expect(logs[0].values).toHaveProperty("email");
+      expect(logs[1].values).toHaveProperty("email");
+      expect(logs[2].values).toHaveProperty("email");
     });
   });
 
@@ -120,7 +120,7 @@ describe("Automatic .returning() Injection", () => {
     it("should automatically capture updated data and create audit log", async () => {
       const auditLogger = createAuditLogger(originalDb, {
         tables: [TABLE_NAME],
-        captureOldValues: true, // Enable to see before/after
+        updateValuesMode: "changed", // Store only changed fields
       });
 
       const { db, setContext } = auditLogger;
@@ -145,15 +145,13 @@ describe("Automatic .returning() Injection", () => {
         .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toMatchObject({ name: "Original Name" });
-      expect(logs[0].newValues).toMatchObject({ name: "Updated Name" });
-      expect(logs[0].changedFields).toContain("name");
+      expect(logs[0].values).toMatchObject({ name: "Updated Name" });
     });
 
-    it("should work when captureOldValues is false", async () => {
+    it('should work when updateValuesMode is "full"', async () => {
       const auditLogger = createAuditLogger(originalDb, {
         tables: [TABLE_NAME],
-        captureOldValues: false,
+        updateValuesMode: "full",
       });
 
       const { db, setContext } = auditLogger;
@@ -167,7 +165,7 @@ describe("Automatic .returning() Injection", () => {
 
       await originalDb.execute(`DELETE FROM audit_logs WHERE table_name = '${TABLE_NAME}'`);
 
-      // Update WITHOUT .returning() and without captureOldValues
+      // Update WITHOUT .returning() and with updateValuesMode="full"
       await db.update(testUsers).set({ name: "New Name" }).where(eq(testUsers.id, user.id));
 
       const logs = await originalDb
@@ -176,8 +174,7 @@ describe("Automatic .returning() Injection", () => {
         .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toBeNull();
-      expect(logs[0].newValues).toMatchObject({ name: "New Name" });
+      expect(logs[0].values).toMatchObject({ name: "New Name" });
     });
   });
 
@@ -207,7 +204,7 @@ describe("Automatic .returning() Injection", () => {
         .where(and(eq(auditLogs.action, "DELETE"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].oldValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "delete@example.com",
         name: "To Delete",
       });
@@ -242,7 +239,7 @@ describe("Automatic .returning() Injection", () => {
         .where(and(eq(auditLogs.action, "INSERT"), eq(auditLogs.tableName, TABLE_NAME)));
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].newValues).toMatchObject({
+      expect(logs[0].values).toMatchObject({
         email: "explicit@example.com",
         name: "Explicit",
       });

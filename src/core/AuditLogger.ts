@@ -126,7 +126,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
       strictMode: config.strictMode ?? false,
       getUserId: config.getUserId || (() => undefined),
       getMetadata: config.getMetadata || (() => ({})),
-      captureOldValues: config.captureOldValues ?? false,
+      updateValuesMode: config.updateValuesMode ?? "changed",
       batch: batchConfig,
       customWriter: config.customWriter,
     };
@@ -176,20 +176,11 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
   }
 
   /**
-   * Check if old values should be captured for UPDATE operations
+   * Check if before state should be captured for UPDATE operations
    * Exposed for use by interceptor
-   *
-   * @returns True if old values should be captured
-   *
-   * @example
-   * ```typescript
-   * if (logger.shouldCaptureOldValues()) {
-   *   // Will run SELECT before UPDATE to get old values
-   * }
-   * ```
    */
-  shouldCaptureOldValues(): boolean {
-    return this.config.captureOldValues;
+  shouldCaptureBeforeState(): boolean {
+    return this.config.updateValuesMode === "changed";
   }
 
   /**
@@ -377,8 +368,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
    * @param entry.action - Action type (e.g., 'READ', 'EXPORT')
    * @param entry.tableName - Table name
    * @param entry.recordId - Record identifier
-   * @param entry.oldValues - Optional old values
-   * @param entry.newValues - Optional new values
+   * @param entry.values - Optional values payload
    * @param entry.metadata - Optional metadata
    *
    * @example
@@ -388,7 +378,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
    *   action: 'READ',
    *   tableName: 'sensitive_documents',
    *   recordId: documentId,
-   *   newValues: { accessedFields: ['ssn', 'salary'] },
+   *   values: { accessedFields: ['ssn', 'salary'] },
    *   metadata: { reason: 'compliance_audit' }
    * });
    *
@@ -405,8 +395,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
     action: string;
     tableName: string;
     recordId: string;
-    oldValues?: Record<string, unknown>;
-    newValues?: Record<string, unknown>;
+    values?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
     if (!this.shouldAudit(entry.tableName)) return;
@@ -415,15 +404,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
       action: entry.action,
       tableName: entry.tableName,
       recordId: entry.recordId,
-      oldValues: entry.oldValues,
-      newValues: entry.newValues,
-      changedFields:
-        entry.oldValues && entry.newValues
-          ? Object.keys(entry.newValues).filter(
-              (key) =>
-                JSON.stringify(entry.oldValues![key]) !== JSON.stringify(entry.newValues![key]),
-            )
-          : undefined,
+      values: entry.values,
       metadata: entry.metadata,
     };
 

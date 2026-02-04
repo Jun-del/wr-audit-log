@@ -161,8 +161,8 @@ interface AuditConfig {
   // Resolve additional metadata
   getMetadata?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 
-  // Whether to capture "before" values for UPDATE operations
-  captureOldValues?: boolean;
+  // How UPDATE values are stored ("changed" or "full")
+  updateValuesMode?: "changed" | "full";
 
   // Batch configuration for async writes (disabled by default)
   batch?: {
@@ -180,9 +180,7 @@ interface AuditConfig {
       action: string;
       tableName: string;
       recordId: string;
-      oldValues?: Record<string, unknown>;
-      newValues?: Record<string, unknown>;
-      changedFields?: string[];
+      values?: Record<string, unknown>;
       metadata?: Record<string, unknown>;
     }>,
     context: AuditContext | undefined,
@@ -203,7 +201,7 @@ Defaults (if omitted):
 - `excludeFields`: `["password", "token", "secret", "apiKey"]`
 - `auditTable`: `"audit_logs"`
 - `strictMode`: `false`
-- `captureOldValues`: `false` (avoids an extra SELECT before UPDATE)
+- `updateValuesMode`: `"changed"` (UPDATE stores only changed fields)
 - `batch`: disabled (writes immediately)
 
 ## Examples

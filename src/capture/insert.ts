@@ -15,8 +15,6 @@ export function createInsertAuditLogs(
     action: "INSERT" as const,
     tableName,
     recordId: extractPrimaryKey(record, tableName),
-    newValues: filterFields(record, tableName, config),
-    oldValues: undefined,
-    changedFields: undefined,
+    values: filterFields(record, tableName, config),
   }));
 }
