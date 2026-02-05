@@ -244,6 +244,37 @@ describe("Automatic .returning() Injection", () => {
         name: "Explicit",
       });
     });
+
+    it("should audit UPDATE when returning a selected column set", async () => {
+      const auditLogger = createAuditLogger(originalDb, {
+        tables: [TABLE_NAME],
+        updateValuesMode: "changed",
+      });
+
+      const { db, setContext } = auditLogger;
+      setContext({ userId: "test-user" });
+
+      const [user] = await db
+        .insert(testUsers)
+        .values({ email: "returning@example.com", name: "Before" })
+        .returning();
+
+      await originalDb.execute(`DELETE FROM audit_logs WHERE table_name = '${TABLE_NAME}'`);
+
+      await db
+        .update(testUsers)
+        .set({ name: "After" })
+        .where(eq(testUsers.id, user.id))
+        .returning({ id: testUsers.id, name: testUsers.name });
+
+      const logs = await originalDb
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, "UPDATE"), eq(auditLogs.tableName, TABLE_NAME)));
+
+      expect(logs).toHaveLength(1);
+      expect(logs[0].values).toMatchObject({ name: "After" });
+    });
   });
 
   describe("Return value handling", () => {
