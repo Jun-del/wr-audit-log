@@ -84,11 +84,16 @@ function extractTableName(queryBuilder: QueryBuilderLike, tableRef?: unknown): s
     if (sqlQuery?.sql) {
       const match = sqlQuery.sql.match(/(?:from|into|update)\s+(?:"?(\w+)"?\.)?"?(\w+)"?/i);
       if (match) {
-        return match[2] ?? match[1] ?? null;
+        const tableName = match[2] ?? match[1] ?? null;
+        if (tableName) {
+          debug("Extracted table name from SQL:", tableName);
+        }
+        return tableName;
       }
+      debug("Failed SQL table extraction", sqlQuery.sql.slice(0, 160));
     }
   } catch (_e) {
-    // Ignore extraction errors
+    debug("Table name extraction error", _e);
   }
 
   return null;

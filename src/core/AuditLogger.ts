@@ -303,7 +303,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
           await writePromise;
         } else {
           writePromise.catch((error) => {
-            console.error("Failed to write audit logs:", error);
+            console.error("[AUDIT] Failed to write audit logs:", error);
           });
         }
       } else if (this.customWriter) {
@@ -318,7 +318,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
           await writePromise;
         } else {
           writePromise.catch((error) => {
-            console.error("Failed to write audit logs:", error);
+            console.error("[AUDIT] Failed to write audit logs:", error);
           });
         }
       } else if (this.writer) {
@@ -329,7 +329,7 @@ export class AuditLogger<TSchema extends Record<string, unknown> = any> {
       if (this.config.strictMode) {
         throw error;
       }
-      console.error("Failed to write audit logs:", error);
+      console.error("[AUDIT] Failed to write audit logs:", error);
     }
   }
 
