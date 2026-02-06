@@ -1,5 +1,11 @@
 # wr-audit-logger
 
+## 0.2.2
+
+### Patch Changes
+
+- 13ed03c: Returning audit improvements
+
 ## 0.2.1
 
 ### Patch Changes
