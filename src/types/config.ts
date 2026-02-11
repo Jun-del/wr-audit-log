@@ -7,6 +7,7 @@ type TableColumns<TTable> = TTable extends { _: { columns: infer C } }
     : never
   : never;
 type TableSelect<TTable> = TTable extends { _: { inferSelect: infer S } } ? S : never;
+type TableColumnName<TTable> = keyof TableColumns<TTable> & string;
 
 type SchemaTable<TSchema, TName extends string> = {
   [K in keyof TSchema]: TSchema[K] extends Table
@@ -30,14 +31,13 @@ export type AuditFieldConfig<TSchema extends Record<string, unknown>> = {
   [K in AuditTableName<TSchema>]?: Array<keyof TableColumns<SchemaTable<TSchema, K>> & string>;
 };
 
-export type AuditTableConfig<TSchema extends Record<string, unknown>> = Partial<
-  Record<
-    AuditTableName<TSchema>,
-    {
-      primaryKey: string | string[];
-    }
-  >
->;
+export type AuditTableConfig<TSchema extends Record<string, unknown>> = Partial<{
+  [K in AuditTableName<TSchema>]: {
+    primaryKey:
+      | TableColumnName<SchemaTable<TSchema, K>>
+      | TableColumnName<SchemaTable<TSchema, K>>[];
+  };
+}>;
 
 export type AuditColumnKey =
   | "id"

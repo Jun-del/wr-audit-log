@@ -31,6 +31,13 @@ createAuditLogger(db, {
 
 createAuditLogger(db, {
   tables: {
+    // @ts-expect-error invalid primary key column for table
+    company_document: { primaryKey: "nope" },
+  },
+});
+
+createAuditLogger(db, {
+  tables: {
     company_document: { primaryKey: "id" },
     // @ts-expect-error invalid table name for tables config
     users: { primaryKey: "id" },
