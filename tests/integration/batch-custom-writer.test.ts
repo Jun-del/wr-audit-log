@@ -21,7 +21,10 @@ const customAuditTable = pgTable("custom_batch_audit_logs", {
   data: text("data"),
 });
 
-describe("Batch Mode with Custom Writer", () => {
+const describeIntegration =
+  process.env.AUDIT_RUN_INTEGRATION_TESTS === "true" ? describe : describe.skip;
+
+describeIntegration("Batch Mode with Custom Writer", () => {
   let client: Client;
   let originalDb: any;
   let customLogs: any[] = [];
@@ -48,11 +51,19 @@ describe("Batch Mode with Custom Writer", () => {
   });
 
   afterAll(async () => {
+    if (!originalDb || !client) {
+      return;
+    }
+
     await originalDb.execute("DROP TABLE IF EXISTS custom_batch_test_users CASCADE");
     await client.end();
   });
 
   beforeEach(async () => {
+    if (!originalDb) {
+      return;
+    }
+
     await originalDb.execute("DELETE FROM custom_batch_test_users");
     customLogs = []; // Clear in-memory logs
   });

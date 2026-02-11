@@ -92,8 +92,8 @@ function extractTableName(queryBuilder: QueryBuilderLike, tableRef?: unknown): s
       }
       debug("Failed SQL table extraction", sqlQuery.sql.slice(0, 160));
     }
-  } catch (_e) {
-    debug("Table name extraction error", _e);
+  } catch (error) {
+    debug("Table name extraction error", error);
   }
 
   return null;
@@ -112,7 +112,7 @@ function extractWhereClause(queryBuilder: QueryBuilderLike): unknown {
     if (queryBuilder._ && queryBuilder._.where) {
       return queryBuilder._.where;
     }
-  } catch (_e) {
+  } catch {
     // Ignore extraction errors
   }
 
@@ -353,34 +353,29 @@ async function executeWithAudit(
 ): Promise<unknown> {
   let beforeState: unknown[] = [];
 
-  try {
-    // For UPDATE only, capture the "before" state if configured
-    if (operation === "update" && auditLogger.shouldCaptureBeforeState()) {
-      beforeState = await captureBeforeState(tableName, queryBuilder, db, tableRef);
-    }
-
-    // Execute the actual operation
-    // For DELETE, we rely on .returning() which is auto-injected
-    let result: unknown;
-    if (typeof originalExecute === "function" && (originalExecute as Function).length === 0) {
-      // It's a wrapper function we created
-      result = await (originalExecute as Function)();
-    } else if (originalExecute) {
-      // It's the original method from Drizzle
-      result = await (originalExecute as Function).apply(queryBuilder, executeArgs);
-    } else {
-      // No execute method, the queryBuilder itself is thenable
-      result = await Promise.resolve(queryBuilder as unknown);
-    }
-
-    // Create audit logs based on operation type
-    await createAuditLogs(operation, tableName, beforeState, result, auditLogger);
-
-    return result;
-  } catch (error) {
-    // Always rethrow - let the application handle the error
-    throw error;
+  // For UPDATE only, capture the "before" state if configured
+  if (operation === "update" && auditLogger.shouldCaptureBeforeState()) {
+    beforeState = await captureBeforeState(tableName, queryBuilder, db, tableRef);
   }
+
+  // Execute the actual operation
+  // For DELETE, we rely on .returning() which is auto-injected
+  let result: unknown;
+  if (typeof originalExecute === "function" && (originalExecute as Function).length === 0) {
+    // It's a wrapper function we created
+    result = await (originalExecute as Function)();
+  } else if (originalExecute) {
+    // It's the original method from Drizzle
+    result = await (originalExecute as Function).apply(queryBuilder, executeArgs);
+  } else {
+    // No execute method, the queryBuilder itself is thenable
+    result = await Promise.resolve(queryBuilder as unknown);
+  }
+
+  // Create audit logs based on operation type
+  await createAuditLogs(operation, tableName, beforeState, result, auditLogger);
+
+  return result;
 }
 
 /**

@@ -4,6 +4,14 @@ import { Client } from "pg";
 import { createAuditTableSQL } from "../../src/index.js";
 
 export default async function globalSetup(): Promise<void> {
+  const isIntegrationRun =
+    process.argv.some((arg) => arg.includes("tests/integration")) ||
+    process.env.AUDIT_RUN_INTEGRATION_TESTS === "true";
+
+  if (!isIntegrationRun) {
+    return;
+  }
+
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     throw new Error("DATABASE_URL is not set");

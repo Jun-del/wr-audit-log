@@ -50,10 +50,8 @@
     "prepare": "husky",
     "prepublishOnly": "pnpm run ci",
     "test": "vitest run",
-    "test:batch": "dotenvx run -- tsx scripts/batch.ts",
-    "test:full-flow": "dotenvx run -- tsx scripts/test-full-flow.ts",
-    "test:integration": "dotenvx run -- vitest run tests/integration",
     "test:unit": "vitest run tests/unit",
+    "test:integration": "AUDIT_RUN_INTEGRATION_TESTS=true dotenvx run -- vitest run tests/integration",
     "typecheck": "tsc --noEmit",
     "typecheck:types": "tsc -p tsconfig.typecheck.json --noEmit"
   },
@@ -85,8 +83,7 @@
     }
   },
   "engines": {
-    "node": ">=24",
-    "pnpm": ">=10.28.2"
+    "node": ">=20"
   },
   "packageManager": "pnpm@10.28.2"
 }

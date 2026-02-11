@@ -79,7 +79,7 @@ function safeStringifyForPK(record: Record<string, unknown>): string {
 
       return value;
     });
-  } catch (error) {
+  } catch {
     // Final fallback: create a stable hash-like string from object keys
     const keys = Object.keys(record).sort();
     return `composite_key_${keys.join("_")}_${keys.length}`;

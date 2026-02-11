@@ -16,7 +16,10 @@ const testUsers = pgTable(TABLE_NAME, {
   name: text("name"),
 });
 
-describe("Automatic .returning() Injection", () => {
+const describeIntegration =
+  process.env.AUDIT_RUN_INTEGRATION_TESTS === "true" ? describe : describe.skip;
+
+describeIntegration("Automatic .returning() Injection", () => {
   let client: Client;
   let originalDb: any;
 
@@ -41,6 +44,10 @@ describe("Automatic .returning() Injection", () => {
   });
 
   afterAll(async () => {
+    if (!originalDb || !client) {
+      return;
+    }
+
     // Clean up only our test table
     await originalDb.execute(`DROP TABLE IF EXISTS "${TABLE_NAME}" CASCADE`);
     // Clean up only our audit logs
@@ -49,6 +56,10 @@ describe("Automatic .returning() Injection", () => {
   });
 
   beforeEach(async () => {
+    if (!originalDb) {
+      return;
+    }
+
     // Clear data before each test
     await originalDb.execute(`TRUNCATE TABLE "${TABLE_NAME}" RESTART IDENTITY CASCADE`);
     // Only delete audit logs for our table

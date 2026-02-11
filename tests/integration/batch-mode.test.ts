@@ -16,7 +16,10 @@ const testUsers = pgTable(USERS_TABLE, {
   name: text("name"),
 });
 
-describe("Batch Mode Integration", () => {
+const describeIntegration =
+  process.env.AUDIT_RUN_INTEGRATION_TESTS === "true" ? describe : describe.skip;
+
+describeIntegration("Batch Mode Integration", () => {
   let client: Client;
   let originalDb: any;
 
@@ -42,12 +45,20 @@ describe("Batch Mode Integration", () => {
   });
 
   afterAll(async () => {
+    if (!originalDb || !client) {
+      return;
+    }
+
     await originalDb.execute(`DELETE FROM audit_logs WHERE table_name = '${USERS_TABLE}'`);
     await originalDb.execute(`DROP TABLE IF EXISTS "${USERS_TABLE}" CASCADE`);
     await client.end();
   });
 
   beforeEach(async () => {
+    if (!originalDb) {
+      return;
+    }
+
     await originalDb.execute(`DELETE FROM "${USERS_TABLE}"`);
     await originalDb.execute(`DELETE FROM audit_logs WHERE table_name = '${USERS_TABLE}'`);
   });

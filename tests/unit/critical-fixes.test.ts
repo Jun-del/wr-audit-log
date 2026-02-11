@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { DEFAULT_AUDIT_COLUMN_MAP } from "../../src/storage/column-map.js";
+import { extractPrimaryKey } from "../../src/utils/primary-key.js";
 
 /**
  * Tests for critical bug fixes
@@ -18,6 +20,7 @@ describe("Critical Bug Fixes", () => {
 
       const writer = new BatchAuditWriter(mockDb as any, {
         auditTable: "audit_logs",
+        auditColumnMap: DEFAULT_AUDIT_COLUMN_MAP,
         batchSize: 5,
         maxQueueSize: 100,
         flushInterval: 60000,
@@ -66,75 +69,27 @@ describe("Critical Bug Fixes", () => {
     });
   });
 
-  describe("Fix #3: BigInt in JSON.stringify", () => {
-    it("should handle BigInt in primary key extraction", () => {
-      const extractPrimaryKey = (record: Record<string, unknown>, tableName: string): string => {
-        // Simplified version of the fix
-        const seen = new WeakSet<object>();
+  describe("Fix #3: primary key serialization", () => {
+    it("stringifies BigInt in composite keys", () => {
+      const result = extractPrimaryKey(
+        { orgId: BigInt(9007199254740991), entryId: "e1" },
+        "ledger",
+        { ledger: { primaryKey: ["orgId", "entryId"] } },
+      );
 
-        try {
-          return JSON.stringify(record, (key, value) => {
-            if (typeof value === "bigint") {
-              return value.toString();
-            }
-            if (value instanceof Date) {
-              return value.toISOString();
-            }
-            if (typeof value === "object" && value !== null) {
-              if (seen.has(value)) {
-                return "[Circular]";
-              }
-              seen.add(value);
-            }
-            return value;
-          });
-        } catch {
-          return `composite_key_fallback`;
-        }
-      };
-
-      const record = {
-        bigIntId: BigInt(9007199254740991),
-        date: new Date("2024-01-01"),
-        nested: { value: 1 },
-      };
-
-      const result = extractPrimaryKey(record, "test");
-
-      // Should not throw and should stringify BigInt as string
       expect(result).toContain('"9007199254740991"');
-      expect(result).toContain("2024-01-01");
+      expect(result).toContain('"entryId":"e1"');
     });
 
-    it("should handle circular references", () => {
-      const extractPrimaryKey = (record: Record<string, unknown>, tableName: string): string => {
-        const seen = new WeakSet<object>();
+    it('serializes circular composite key structures as "[Circular]"', () => {
+      const circular: { id: number; self?: unknown } = { id: 1 };
+      circular.self = circular;
 
-        try {
-          return JSON.stringify(record, (key, value) => {
-            if (typeof value === "bigint") {
-              return value.toString();
-            }
-            if (typeof value === "object" && value !== null) {
-              if (seen.has(value)) {
-                return "[Circular]";
-              }
-              seen.add(value);
-            }
-            return value;
-          });
-        } catch {
-          return `composite_key_fallback`;
-        }
-      };
+      const result = extractPrimaryKey({ tenant: "acme", composite: circular }, "records", {
+        records: { primaryKey: ["tenant", "composite"] },
+      });
 
-      const record: any = { id: 1, name: "test" };
-      record.self = record; // Circular reference
-
-      const result = extractPrimaryKey(record, "test");
-
-      // Should not throw and should handle circular ref
-      expect(result).toContain("[Circular]");
+      expect(result).toContain('"self":"[Circular]"');
     });
   });
 
@@ -150,6 +105,7 @@ describe("Critical Bug Fixes", () => {
 
       const writer = new BatchAuditWriter(mockDb as any, {
         auditTable: "audit_logs",
+        auditColumnMap: DEFAULT_AUDIT_COLUMN_MAP,
         batchSize: 5,
         maxQueueSize: 100,
         flushInterval: 60000,
@@ -196,6 +152,7 @@ describe("Critical Bug Fixes", () => {
 
       const writer = new BatchAuditWriter(mockDb as any, {
         auditTable: "audit_logs",
+        auditColumnMap: DEFAULT_AUDIT_COLUMN_MAP,
         batchSize: 100, // High batch size to avoid auto-flush
         maxQueueSize: 1000,
         flushInterval: 60000,

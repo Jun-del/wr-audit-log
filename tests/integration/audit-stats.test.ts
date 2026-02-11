@@ -6,7 +6,10 @@ import { getAuditStats } from "../../src/index.js";
 const TEST_ID = `stats_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 const TABLE_NAME = `stats_table_${TEST_ID}`;
 
-describe("Audit stats (Integration)", () => {
+const describeIntegration =
+  process.env.AUDIT_RUN_INTEGRATION_TESTS === "true" ? describe : describe.skip;
+
+describeIntegration("Audit stats (Integration)", () => {
   let client: Client;
   let db: any;
 
@@ -22,6 +25,10 @@ describe("Audit stats (Integration)", () => {
   });
 
   afterAll(async () => {
+    if (!db || !client) {
+      return;
+    }
+
     await db.execute(`DELETE FROM audit_logs WHERE table_name = '${TABLE_NAME}'`);
     await client.end();
   });

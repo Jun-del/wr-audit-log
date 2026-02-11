@@ -25,7 +25,10 @@ const testVehicles = pgTable(VEHICLES_TABLE, {
   status: varchar("status", { length: 50 }),
 });
 
-describe("Automatic Audit Logging (Integration)", () => {
+const describeIntegration =
+  process.env.AUDIT_RUN_INTEGRATION_TESTS === "true" ? describe : describe.skip;
+
+describeIntegration("Automatic Audit Logging (Integration)", () => {
   let client: Client;
   let originalDb: any;
   let db: any;
@@ -72,6 +75,10 @@ describe("Automatic Audit Logging (Integration)", () => {
   });
 
   afterAll(async () => {
+    if (!originalDb || !client) {
+      return;
+    }
+
     // Clean up only our test tables
     await originalDb.execute(`DROP TABLE IF EXISTS "${USERS_TABLE}" CASCADE`);
     await originalDb.execute(`DROP TABLE IF EXISTS "${VEHICLES_TABLE}" CASCADE`);
@@ -83,6 +90,10 @@ describe("Automatic Audit Logging (Integration)", () => {
   });
 
   beforeEach(async () => {
+    if (!originalDb) {
+      return;
+    }
+
     // Clear data before each test
     await originalDb.execute(`TRUNCATE TABLE "${USERS_TABLE}" RESTART IDENTITY CASCADE`);
     await originalDb.execute(`TRUNCATE TABLE "${VEHICLES_TABLE}" RESTART IDENTITY CASCADE`);

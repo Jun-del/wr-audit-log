@@ -41,7 +41,7 @@ export async function checkAuditSetup(
     `);
 
     return result.rows[0]?.exists === true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
